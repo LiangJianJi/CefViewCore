@@ -36,15 +36,16 @@ CefViewBrowserClient::OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser,
   auto url = currentUrl.ToString();
   //std::string httpPrefix = "http";
   // origin
-  std::string originHeader = "origin";
-  CefString currentOrigin = request->GetHeaderByName(originHeader);
+  std::string originString = "origin";
+  std::string originStringUpper = "Origin";
+  CefString currentOrigin = request->GetHeaderByName(originString);
   auto origin = currentOrigin.ToString();
   //logD("require origin - before: %s", origin.c_str());
-  if (currentOrigin == "file://" /*&&
+  if (origin == "file://" /*&&
       url.size() >= httpPrefix.size() &&
       url.compare(0, httpPrefix.size(), httpPrefix) == 0*/) {
 #if 0
-    request->SetHeaderByName(originHeader, "", true);
+    request->SetHeaderByName(originString, "", true);
 #else
     // 获取请求头
     CefRequest::HeaderMap headers;
@@ -57,9 +58,13 @@ CefViewBrowserClient::OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser,
     //  logD("require headers: %s = %s", tmpKeyString.c_str(), tmpValueString.c_str());
     //}
     // 查找并移除 origin 的请求头字段
-    auto it = headers.find(originHeader);
+    auto it = headers.find(originString);
     if (it != headers.end()) {
       headers.erase(it);
+    }
+    auto itUpper = headers.find(originStringUpper);
+    if (itUpper != headers.end()) {
+      headers.erase(itUpper);
     }
     // 设置修改后的请求头
     request->SetHeaderMap(headers);
