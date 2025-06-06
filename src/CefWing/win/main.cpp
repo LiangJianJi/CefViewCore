@@ -21,6 +21,17 @@
 #include "../App/CefViewOtherApp.h"
 #include "../App/CefViewRenderApp.h"
 
+#if defined(ENABLE_GPU_OPTIMUS) && ENABLE_GPU_OPTIMUS
+extern "C"
+{
+  // http://developer.download.nvidia.com/devzone/devcenter/gamegraphics/files/OptimusRenderingPolicies.pdf
+  __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+
+  // https://gpuopen.com/learn/amdpowerxpressrequesthighperformance
+  _declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
+}
+#endif
+
 int
 CefViewWingMain(HINSTANCE hInstance)
 {
