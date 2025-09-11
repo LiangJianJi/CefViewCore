@@ -34,13 +34,20 @@ CefViewBrowserClient::OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser,
   // url
   CefString currentUrl = request->GetURL();
   auto url = currentUrl.ToString();
-  //std::string httpPrefix = "http";
   // origin
   std::string originString = "origin";
   std::string originStringUpper = "Origin";
   CefString currentOrigin = request->GetHeaderByName(originString);
   auto origin = currentOrigin.ToString();
+  logD("url origin: %s", origin.c_str());
+  std::string refererString = "referer";
+  std::string refererStringUpper = "Referer";
+  CefString currentReferer = request->GetHeaderByName(refererString);
+  auto referer = currentReferer.ToString();
+  logD("url referer: %s", referer.c_str());
+#if 0
   //logD("require origin - before: %s", origin.c_str());
+  //std::string httpPrefix = "http";
   if (origin == "file://" /*&&
       url.size() >= httpPrefix.size() &&
       url.compare(0, httpPrefix.size(), httpPrefix) == 0*/) {
@@ -72,6 +79,7 @@ CefViewBrowserClient::OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser,
   }
   //logD("require origin - end: %s", origin.c_str());
   //logD("require resource: %s", url.c_str());
+#endif
   return resource_manager_->OnBeforeResourceLoad(browser, frame, request, callback);
 }
 
