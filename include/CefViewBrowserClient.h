@@ -46,6 +46,7 @@ class CefViewBrowserClient
   , public CefKeyboardHandler
   , public CefLifeSpanHandler
   , public CefLoadHandler
+  , public CefPermissionHandler
   , public CefRequestHandler
   , public CefResourceRequestHandler
   , public CefRenderHandler
@@ -410,6 +411,35 @@ protected:
                                       const CefString& selected_text,
                                       const CefRange& selected_range) override;
   virtual void OnVirtualKeyboardRequested(CefRefPtr<CefBrowser> browser, TextInputMode input_mode) override;
+#pragma endregion
+
+  // CefPermissionHandler methods
+#pragma region CefPermissionHandler
+  virtual CefRefPtr<CefPermissionHandler> GetPermissionHandler() override { return this; }
+  // virtual bool OnRequestMediaAccessPermission(CefRefPtr<CefBrowser> browser,
+  //                                             CefRefPtr<CefFrame> frame,
+  //                                             const CefString& requesting_origin,
+  //                                             uint32 requested_permissions,
+  //                                             CefRefPtr<CefMediaAccessCallback> callback) override
+  //{
+  //   return false;
+  //}
+  virtual bool OnShowPermissionPrompt(CefRefPtr<CefBrowser> browser,
+                                      uint64 prompt_id,
+                                      const CefString& requesting_origin,
+                                      uint32 requested_permissions,
+                                      CefRefPtr<CefPermissionPromptCallback> callback) override
+  {
+    if (callback) {
+      callback->Continue(CEF_PERMISSION_RESULT_ACCEPT); // 允许
+    }
+    return true; // 已处理
+  }
+  // virtual void OnDismissPermissionPrompt(CefRefPtr<CefBrowser> browser,
+  //                                        uint64 prompt_id,
+  //                                        cef_permission_request_result_t result) override
+  //{
+  //}
 #pragma endregion
 
   // CefRequestHandler methods
