@@ -11,6 +11,7 @@
 #include <CefViewCoreProtocol.h>
 
 #include "CefViewQueryHandler/CefViewQueryHandler.h"
+#include "CefViewDirectoryProvider/CefViewDirectoryProvider.h"
 
 CefViewBrowserClient::CefViewBrowserClient(CefRefPtr<CefViewBrowserApp> app,
                                            CefViewBrowserClientDelegateInterface::RefPtr delegate)
@@ -49,11 +50,26 @@ CefViewBrowserClient::~CefViewBrowserClient()
 void
 CefViewBrowserClient::CloseAllBrowsers()
 {
-  close_by_native_ = true;
-  auto browsers = browser_map_;
-  for (auto& kv : browsers) {
-    kv.second->StopLoad();
-    kv.second->GetHost()->CloseBrowser(true);
+  CefRefPtr<CefViewBrowserClient> self = this;
+  auto closeTask = [self]() {
+    // set flags
+    self->is_closing_ = true;
+    self->close_by_native_ = true;
+
+    // close all browser in current client instance
+    auto browserMap = self->browser_map_;
+    for (auto& kv : browserMap) {
+      if (kv.second) {
+        kv.second->StopLoad();
+        kv.second->GetHost()->CloseBrowser(true);
+      }
+    }
+  };
+
+  if (CefCurrentlyOn(TID_UI)) {
+    closeTask();
+  } else {
+    CefPostTask(TID_UI, new CefLambdaTask(std::move(closeTask)));
   }
 }
 
@@ -71,7 +87,11 @@ CefViewBrowserClient::AddLocalDirectoryResourceProvider(const CefString& dir_pat
     lower_url.begin(), lower_url.end(), lower_url.begin(), [](unsigned char c) { return std::tolower(c); });
 
   std::string identifier;
-  resource_manager_->AddDirectoryProvider(lower_url, dir_path, priority, identifier);
+  // we use CefViewDirectoryProvider to support HTTP range request
+  resource_manager_->AddProvider( //
+    new CefViewDirectoryProvider(lower_url, dir_path),
+    priority,
+    identifier);
 }
 
 void

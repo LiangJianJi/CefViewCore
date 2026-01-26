@@ -105,16 +105,8 @@ endif()
 
 if(OS_WINDOWS)
   add_link_options(/DEBUG)
-
-  if(USE_SANDBOX)
-    # cef_sandbox.lib is MT already, must keep the same with it
-    set(CEF_RUNTIME_LIBRARY_FLAG "/MT" CACHE STRING "Use static runtime")
-    add_compile_options("/MT$<$<CONFIG:Debug>:d>")
-  else()
-    # either MT or MD is supported
-    set(CEF_RUNTIME_LIBRARY_FLAG "/M$<IF:$<BOOL:${STATIC_CRT}>,T,D>" CACHE STRING "Use static runtime" FORCE)
-    add_compile_options("/M$<IF:$<BOOL:${STATIC_CRT}>,T,D>$<$<CONFIG:Debug>:d>")
-  endif()
+  set(CEF_RUNTIME_LIBRARY_FLAG "/M$<IF:$<BOOL:${STATIC_CRT}>,T,D>" CACHE STRING "Use static runtime" FORCE)
+  add_compile_options("/M$<IF:$<BOOL:${STATIC_CRT}>,T,D>$<$<CONFIG:Debug>:d>")
 else()
   add_compile_options(
     "-g"
@@ -131,93 +123,44 @@ find_package(CEF REQUIRED)
 # Add libcef dll wrapper
 add_subdirectory(${CEF_LIBCEF_DLL_WRAPPER_PATH} libcef_dll_wrapper)
 
-if(USE_SANDBOX AND(OS_WINDOWS OR OS_MACOS))
-  add_definitions(-DCEF_USE_SANDBOX)
-
-  # message(STATUS "cef_sandbox_lib path:" "${CEF_SANDBOX_LIB_DEBUG}," "${CEF_SANDBOX_LIB_RELEASE}" )
-  # Logical target used to link the cef_sandbox library.
-  ADD_LOGICAL_TARGET("cef_sandbox_lib" "${CEF_SANDBOX_LIB_DEBUG}" "${CEF_SANDBOX_LIB_RELEASE}")
-endif()
-
 PRINT_CEF_CONFIG()
 
 # #################################################################################
 # Stage 4. Read CEF version and generated CefVersion.h
 # set need configure QCefView_global to false
+message(STATUS "${CEF_ROOT}/include/cef_version.h")
+file(READ "${CEF_ROOT}/include/cef_version.h" cef_sdk_ver_content)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include/CefVersion.h")
+  file(READ "${CMAKE_CURRENT_SOURCE_DIR}/include/CefVersion.h" cef_local_ver_content)
+else()
+  set(local_cef_version_content "")
+endif()
+
 set(Need_Config_CefVersion_File FALSE)
 
-message(STATUS "${CEF_ROOT}/include/cef_version.h")
-file(READ "${CEF_ROOT}/include/cef_version.h" cef_version_content)
+macro(compare_cef_version _verSeg _verReg _sdkContent _localContent)
+  # read version seg value from CEF header file
+  string(REGEX MATCH "#define ${_verSeg} ${_verReg}" _ "${_sdkContent}")
+  set(${_verSeg} ${CMAKE_MATCH_1} CACHE STRING "CEF Version" FORCE)
 
-# ------------ check CEF_VERSION
-string(REGEX MATCH "#define CEF_VERSION \"([a-z0-9\.\+\-]+)\"" _ ${cef_version_content})
+  string(REGEX MATCH "#define ${_verSeg} ${_verReg}" _ "${_localContent}")
+  set(LOCAL_${_verSeg} ${CMAKE_MATCH_1} CACHE STRING "CEF Version" FORCE)
 
-if(NOT "${CMAKE_MATCH_1}" STREQUAL "${CEF_VERSION}")
-  set(CEF_VERSION ${CMAKE_MATCH_1} CACHE STRING "CEF Version" FORCE)
-  set(Need_Config_CefVersion_File TRUE)
-  message(STATUS "CEF_VERSION: ${CEF_VERSION} - Updated!")
-else()
-  message(STATUS "CEF_VERSION: ${CEF_VERSION} - No Change!")
-endif()
+  if(NOT "${${_verSeg}}" STREQUAL "${LOCAL_${_verSeg}}")
+    set(Need_Config_CefVersion_File TRUE)
+    message(STATUS "${_verSeg} Changed: ${LOCAL_${_verSeg}} -> ${${_verSeg}}")
+  else()
+    message(STATUS "${_verSeg} Same: ${LOCAL_${_verSeg}} = ${${_verSeg}}")
+  endif()
+endmacro(compare_cef_version)
 
-# ------------ check CEF_VERSION_MAJOR
-string(REGEX MATCH "#define CEF_VERSION_MAJOR ([0-9]+)" _ ${cef_version_content})
-
-if(NOT "${CMAKE_MATCH_1}" STREQUAL "${CEF_VERSION_MAJOR}")
-  set(CEF_VERSION_MAJOR ${CMAKE_MATCH_1} CACHE STRING "CEF Major Version" FORCE)
-  set(Need_Config_CefVersion_File TRUE)
-  message(STATUS "CEF_VERSION_MAJOR: ${CEF_VERSION_MAJOR} - Updated!")
-else()
-  message(STATUS "CEF_VERSION_MAJOR: ${CEF_VERSION_MAJOR} - No Change!")
-endif()
-
-# ------------ check CEF_VERSION_MINOR
-string(REGEX MATCH "#define CEF_VERSION_MINOR ([0-9]+)" _ ${cef_version_content})
-
-if(NOT "${CMAKE_MATCH_1}" STREQUAL "${CEF_VERSION_MINOR}")
-  set(CEF_VERSION_MINOR ${CMAKE_MATCH_1} CACHE STRING "CEF Minor Version" FORCE)
-  set(Need_Config_CefVersion_File TRUE)
-  message(STATUS "CEF_VERSION_MINOR: ${CEF_VERSION_MINOR} - Updated!")
-else()
-  message(STATUS "CEF_VERSION_MINOR: ${CEF_VERSION_MINOR} - No Change!")
-endif()
-
-# ------------ check CEF_VERSION_PATCH
-string(REGEX MATCH "#define CEF_VERSION_PATCH ([0-9]+)" _ ${cef_version_content})
-
-if(NOT "${CMAKE_MATCH_1}" STREQUAL "${CEF_VERSION_PATCH}")
-  set(CEF_VERSION_PATCH ${CMAKE_MATCH_1} CACHE STRING "CEF Patch Version" FORCE)
-  set(Need_Config_CefVersion_File TRUE)
-  message(STATUS "CEF_VERSION_PATCH: ${CEF_VERSION_PATCH} - Updated!")
-else()
-  message(STATUS "CEF_VERSION_PATCH: ${CEF_VERSION_PATCH} - No Change!")
-endif()
-
-# ------------ check CEF_COMMIT_NUMBER
-string(REGEX MATCH "#define CEF_COMMIT_NUMBER ([0-9]+)" _ ${cef_version_content})
-
-if(NOT "${CMAKE_MATCH_1}" STREQUAL "${CEF_COMMIT_NUMBER}")
-  set(CEF_COMMIT_NUMBER ${CMAKE_MATCH_1} CACHE STRING "CEF Commit Number" FORCE)
-  set(Need_Config_CefVersion_File TRUE)
-  message(STATUS "CEF_COMMIT_NUMBER: ${CEF_COMMIT_NUMBER} - Updated!")
-else()
-  message(STATUS "CEF_COMMIT_NUMBER: ${CEF_COMMIT_NUMBER} - No Change!")
-endif()
-
-# ------------ check CEF_COMMIT_HASH
-string(REGEX MATCH "#define CEF_COMMIT_HASH \"([a-z0-9]+)\"" _ ${cef_version_content})
-
-if(NOT "${CMAKE_MATCH_1}" STREQUAL "${CEF_COMMIT_HASH}")
-  set(CEF_COMMIT_HASH ${CMAKE_MATCH_1} CACHE STRING "CEF Commit Hash" FORCE)
-  set(Need_Config_CefVersion_File TRUE)
-  message(STATUS "CEF_COMMIT_HASH: ${CEF_COMMIT_HASH} - Updated!")
-else()
-  message(STATUS "CEF_COMMIT_HASH: ${CEF_COMMIT_HASH} - No Change!")
-endif()
-
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include/CefVersion.h")
-  set(Need_Config_CefVersion_File TRUE)
-endif()
+compare_cef_version(CEF_VERSION "\"([a-z0-9\.\+\-]+)\"" "${cef_sdk_ver_content}" "${cef_local_ver_content}")
+compare_cef_version(CEF_VERSION_MAJOR "([0-9]+)" "${cef_sdk_ver_content}" "${cef_local_ver_content}")
+compare_cef_version(CEF_VERSION_MINOR "([0-9]+)" "${cef_sdk_ver_content}" "${cef_local_ver_content}")
+compare_cef_version(CEF_VERSION_PATCH "([0-9]+)" "${cef_sdk_ver_content}" "${cef_local_ver_content}")
+compare_cef_version(CEF_COMMIT_NUMBER "([0-9]+)" "${cef_sdk_ver_content}" "${cef_local_ver_content}")
+compare_cef_version(CEF_COMMIT_HASH "\"([a-z0-9]+)\"" "${cef_sdk_ver_content}" "${cef_local_ver_content}")
 
 if(${Need_Config_CefVersion_File})
   message(STATUS "Need to configure CefVersion.h file")
@@ -230,3 +173,53 @@ if(${Need_Config_CefVersion_File})
 else()
   message(STATUS "No need to configure CefVersion.h file")
 endif()
+
+# config CEF sandbox
+if(USE_SANDBOX)
+  # sandbox enable
+  if(OS_WINDOWS)
+    # Window
+    if(CEF_VERSION_MAJOR LESS 138)
+      # for CEF below 138 we need to link the cef_sandbox.lib
+      if(STATIC_CRT)
+        # sandbox enabled
+        add_definitions(-DCEF_USE_SANDBOX)
+        message(STATUS "cef_sandbox_lib path:" "${CEF_SANDBOX_LIB_DEBUG}," "${CEF_SANDBOX_LIB_RELEASE}")
+        ADD_LOGICAL_TARGET("cef_sandbox_lib" "${CEF_SANDBOX_LIB_DEBUG}" "${CEF_SANDBOX_LIB_RELEASE}")
+      else()
+        string(JOIN "\n" SANDBOX_CONFIG_ERROR_MESSAGE
+          " ####################################################################################################################"
+          " #                                                                                                                  #"
+          " # CefViewCore:CEF sandbox on Windows requires STATIC_CRT=ON                                                        #"
+          " #                                                                                                                  #"
+          " ####################################################################################################################"
+          " "
+        )
+        message(FATAL_ERROR ${SANDBOX_CONFIG_ERROR_MESSAGE})
+      endif() # STATIC_CRT
+    else()
+      # for CEF 138+, sandbox is not supported
+      string(JOIN "\n" SANDBOX_CONFIG_ERROR_MESSAGE
+        " ####################################################################################################################"
+        " #                                                                                                                  #"
+        " # CEF sandbox on Windows is not supported when >= 138, please refer to:                                            #"
+        " # https://bitbucket.org/chromiumembedded/cef/wiki/SandboxSetup.md#markdown-header-building-bootstrap-windows       #"
+        " #                                                                                                                  #"
+        " ####################################################################################################################"
+        " "
+      )
+      message(FATAL_ERROR ${SANDBOX_CONFIG_ERROR_MESSAGE})
+    endif() # CEF_VERSION_MAJOR LESS 138
+  endif() # OS_WINDOWS
+
+  if(OS_MACOS)
+    # macOS
+    add_definitions(-DCEF_USE_SANDBOX)
+
+    if(CEF_VERSION_MAJOR LESS 138)
+      # for CEF below 138 we need to link the cef_sandbox.lib
+      message(STATUS "cef_sandbox_lib path:" "${CEF_SANDBOX_LIB_DEBUG}," "${CEF_SANDBOX_LIB_RELEASE}")
+      ADD_LOGICAL_TARGET("cef_sandbox_lib" "${CEF_SANDBOX_LIB_DEBUG}" "${CEF_SANDBOX_LIB_RELEASE}")
+    endif() # CEF_VERSION_MAJOR LESS 138
+  endif() # OS_MACOS
+endif() # USE_SANDBOX
