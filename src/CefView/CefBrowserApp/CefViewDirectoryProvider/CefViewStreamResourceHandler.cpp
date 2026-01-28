@@ -1,7 +1,22 @@
 ﻿#include "CefViewStreamResourceHandler.h"
 
 #include <algorithm>
+#ifdef __APPLE__
+#include <Availability.h>
+#endif
+#if defined(__APPLE__) && defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED < 101500
+// 对于 macOS 10.15 以下版本，使用替代方案
+#include <sys/stat.h>
+#include <unistd.h>
+off_t file_size(const std::string& path) {
+  struct stat stat_buf;
+  int rc = stat(path.c_str(), &stat_buf);
+  return rc == 0 ? stat_buf.st_size : -1;
+}
+#else
+// 对于 macOS 10.15+ 或其他平台，使用 std::filesystem
 #include <filesystem>
+#endif
 #include <vector>
 #include <utility>
 #include <chrono>
@@ -141,6 +156,28 @@ Make416Response(CefRefPtr<CefResponse>& response, const int64_t& file_size)
   return file_size;
 }
 
+#ifdef __APPLE__
+// mcaOS
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 101500
+std::string
+GetLastModifiedTime(const std::string& file_path)
+{
+  struct stat file_stat;
+  if (stat(file_path.c_str(), &file_stat) != 0) {
+    return {};
+  }
+
+  // 将 timespec 转换为 time_t
+  auto mod_time = file_stat.st_mtimespec.tv_sec;
+
+  std::tm tm;
+  gmtime_r(&mod_time, &tm);
+
+  std::ostringstream oss;
+  oss << std::put_time(&tm, "%a, %d %b %Y %H:%M:%S GMT");
+  return oss.str();
+}
+#else  // macOS 10.15+
 std::string
 GetLastModifiedTime(const std::string& file_path)
 {
@@ -160,6 +197,28 @@ GetLastModifiedTime(const std::string& file_path)
   oss << std::put_time(&tm, "%a, %d %b %Y %H:%M:%S GMT");
   return oss.str();
 }
+#endif  // __MAC_OS_X_VERSION_MIN_REQUIRED < 101500
+#else // Windows / Linux
+std::string
+GetLastModifiedTime(const std::string& file_path)
+{
+  using namespace std::chrono;
+  using namespace std::filesystem;
+
+  std::error_code ec;
+  auto ftime = last_write_time(file_path, ec);
+  if (ec)
+    return {};
+
+  auto tt = system_clock::to_time_t(system_clock::now() +
+                                    duration_cast<system_clock::duration>(ftime - file_time_type::clock::now()));
+  auto tm = *std::gmtime(&tt);
+
+  std::ostringstream oss;
+  oss << std::put_time(&tm, "%a, %d %b %Y %H:%M:%S GMT");
+  return oss.str();
+}
+#endif  // __APPLE__
 } // namespace
 
 CefViewStreamResourceHandler::CefViewStreamResourceHandler( //
@@ -177,7 +236,15 @@ CefViewStreamResourceHandler::CefViewStreamResourceHandler( //
   };
 
   std::error_code ec;
+#ifdef __APPLE__
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 101500
+  file_size_ = file_size(file_path_.ToString());
+#else
   file_size_ = std::filesystem::file_size(file_path_.ToWString(), ec);
+#endif
+#else
+  file_size_ = std::filesystem::file_size(file_path_.ToWString(), ec);
+#endif
 }
 
 bool
