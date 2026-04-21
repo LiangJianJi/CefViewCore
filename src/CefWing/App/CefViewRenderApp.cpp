@@ -67,7 +67,9 @@ CefViewRenderApp::OnContextCreated(CefRefPtr<CefBrowser> browser,
   // [Javascript Context]
   // V8 context for this frame has been initialized already,
   // but the script of the page hasn't been executed now
-  message_router_->OnContextCreated(browser, frame, context);
+  if (message_router_) {
+    message_router_->OnContextCreated(browser, frame, context);
+  }
 
   // log this event
   frame->ExecuteJavaScript("console.info('[JSRuntime]:frame context created')", frame->GetURL(), 0);
@@ -94,7 +96,9 @@ CefViewRenderApp::OnContextReleased(CefRefPtr<CefBrowser> browser,
 {
   CEF_REQUIRE_RENDERER_THREAD();
 
-  message_router_->OnContextReleased(browser, frame, context);
+  if (message_router_) {
+    message_router_->OnContextReleased(browser, frame, context);
+  }
 
   auto frameId = frame->GetIdentifier();
   auto it = frame_id_to_bridge_obj_map_.find(frameId);
@@ -140,7 +144,8 @@ CefViewRenderApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
 
   bool handled = false;
 
-  if (message_router_->OnProcessMessageReceived(browser, frame, source_process, message)) {
+  if (message_router_ &&
+      message_router_->OnProcessMessageReceived(browser, frame, source_process, message)) {
     handled = true;
   }
 

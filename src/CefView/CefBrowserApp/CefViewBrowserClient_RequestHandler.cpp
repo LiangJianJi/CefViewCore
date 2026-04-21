@@ -23,7 +23,9 @@ CefViewBrowserClient::OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
 {
   CEF_REQUIRE_UI_THREAD();
 
-  message_router_->OnBeforeBrowse(browser, frame);
+  if (message_router_) {
+    message_router_->OnBeforeBrowse(browser, frame);
+  }
   return false;
 }
 
@@ -70,7 +72,9 @@ CefViewBrowserClient::OnRenderProcessTerminated(CefRefPtr<CefBrowser> browser,
 {
   CEF_REQUIRE_UI_THREAD();
 
-  message_router_->OnRenderProcessTerminated(browser);
+  if (message_router_) {
+    message_router_->OnRenderProcessTerminated(browser);
+  }
 
   if (browser) {
     CefString url = browser->GetMainFrame()->GetURL();

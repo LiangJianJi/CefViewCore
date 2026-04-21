@@ -286,7 +286,8 @@ CefViewBrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
                                                CefRefPtr<CefProcessMessage> message)
 {
   CEF_REQUIRE_UI_THREAD();
-  if (message_router_->OnProcessMessageReceived(browser, frame, source_process, message))
+  if (message_router_ &&
+      message_router_->OnProcessMessageReceived(browser, frame, source_process, message))
     return true;
 
   if (DispatchRenderMessage(browser, frame, message))

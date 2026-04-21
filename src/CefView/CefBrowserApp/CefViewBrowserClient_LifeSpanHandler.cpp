@@ -74,7 +74,9 @@ CefViewBrowserClient::OnAfterCreated(CefRefPtr<CefBrowser> browser)
     message_router_ = CefMessageRouterBrowserSide::Create(message_router_config_);
 
     message_router_handler_ = new CefViewQueryHandler(client_delegate_);
-    message_router_->AddHandler(message_router_handler_.get(), false);
+    if (message_router_) {
+      message_router_->AddHandler(message_router_handler_.get(), false);
+    }
   }
 
   if (auto delegate = client_delegate_.lock()) {
@@ -122,12 +124,16 @@ CefViewBrowserClient::OnBeforeClose(CefRefPtr<CefBrowser> browser)
     delegate->onBeforeClose(browser);
   }
 
-  message_router_->OnBeforeClose(browser);
+  if (message_router_) {
+    message_router_->OnBeforeClose(browser);
+  }
 
   browser_map_.erase(browser->GetIdentifier());
 
   if (browser_map_.empty()) {
-    message_router_->RemoveHandler(message_router_handler_.get());
+    if (message_router_) {
+      message_router_->RemoveHandler(message_router_handler_.get());
+    }
     message_router_ = nullptr;
     message_router_handler_ = nullptr;
   }
